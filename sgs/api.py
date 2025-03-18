@@ -1,5 +1,6 @@
 import functools
 from typing import Union, List, Dict
+import time
 
 import pandas as pd
 import requests
@@ -7,10 +8,12 @@ from retrying import retry
 
 from .common import LRU_CACHE_SIZE, MAX_ATTEMPT_NUMBER, to_datetime
 
+MAX_RETRIES = 5
 
-@retry(stop_max_attempt_number=MAX_ATTEMPT_NUMBER)
+
+# @retry(stop_max_attempt_number=MAX_ATTEMPT_NUMBER)
 @functools.lru_cache(maxsize=LRU_CACHE_SIZE)
-def get_data(ts_code: int, begin: str, end: str) -> List:
+def get_data(ts_code: int, begin: str, end: str, ntry: int = 0) -> List:
     """
     Requests time series data from the SGS API in json format.
     """
@@ -20,7 +23,19 @@ def get_data(ts_code: int, begin: str, end: str) -> List:
         "/dados?formato=json&dataInicial={}&dataFinal={}"
     )
     request_url = url.format(ts_code, begin, end)
-    response = requests.get(request_url)
+    try:
+        response = requests.get(request_url, timeout=10)
+        response.raise_for_status()
+
+    except requests.exceptions.RequestException as e:
+        print(f"Tentativa {ntry + 1} falhou: {e}")
+        ntry += 1
+        if ntry < MAX_RETRIES:
+            wait_time = 2**ntry
+            print(f"Aguardando {wait_time}s antes de tentar novamente...")
+            time.sleep(wait_time)
+            return get_data(ts_code, begin, end, ntry)
+
     return response.json()
 
 
