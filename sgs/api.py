@@ -26,8 +26,9 @@ def get_data(ts_code: int, begin: str, end: str, ntry: int = 0) -> List:
     try:
         response = requests.get(request_url, timeout=10)
         response.raise_for_status()
+        response_json = response.json()
 
-    except requests.exceptions.RequestException as e:
+    except Exception as e:
         print(f"Tentativa {ntry + 1} falhou: {e}")
         ntry += 1
         if ntry < MAX_RETRIES:
@@ -36,7 +37,7 @@ def get_data(ts_code: int, begin: str, end: str, ntry: int = 0) -> List:
             time.sleep(wait_time)
             return get_data(ts_code, begin, end, ntry)
 
-    return response.json()
+    return response_json
 
 
 def get_data_with_strict_range(ts_code: int, begin: str, end: str) -> List:
