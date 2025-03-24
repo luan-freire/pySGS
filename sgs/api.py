@@ -36,6 +36,8 @@ def get_data(ts_code: int, begin: str, end: str, ntry: int = 0) -> List:
             print(f"Aguardando {wait_time}s antes de tentar novamente...")
             time.sleep(wait_time)
             return get_data(ts_code, begin, end, ntry)
+        else:
+            raise e
 
     return response_json
 
