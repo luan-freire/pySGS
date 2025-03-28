@@ -24,7 +24,7 @@ def get_data(ts_code: int, begin: str, end: str, ntry: int = 0) -> List:
     )
     request_url = url.format(ts_code, begin, end)
     try:
-        response = requests.get(request_url, timeout=10)
+        response = requests.get(request_url, timeout=30)
         response.raise_for_status()
         response_json = response.json()
 
