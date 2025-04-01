@@ -1,6 +1,7 @@
 import functools
 from typing import Union, List, Dict
 import time
+from datetime import datetime, timedelta
 
 import pandas as pd
 import requests
@@ -15,31 +16,47 @@ MAX_RETRIES = 5
 @functools.lru_cache(maxsize=LRU_CACHE_SIZE)
 def get_data(ts_code: int, begin: str, end: str, ntry: int = 0) -> List:
     """
-    Requests time series data from the SGS API in json format.
+    Requests time series data from the SGS API in json format,
+    ensuring the date range does not exceed 10 years.
     """
 
-    url = (
-        "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{}"
-        "/dados?formato=json&dataInicial={}&dataFinal={}"
-    )
-    request_url = url.format(ts_code, begin, end)
-    try:
-        response = requests.get(request_url, timeout=30)
-        response.raise_for_status()
-        response_json = response.json()
+    def parse_date(date_str: str) -> datetime:
+        return datetime.strptime(date_str, "%d/%m/%Y")
 
-    except Exception as e:
-        print(f"Tentativa {ntry + 1} falhou: {e}")
-        ntry += 1
-        if ntry < MAX_RETRIES:
-            wait_time = 2**ntry
-            print(f"Aguardando {wait_time}s antes de tentar novamente...")
-            time.sleep(wait_time)
-            return get_data(ts_code, begin, end, ntry)
-        else:
-            raise e
+    def format_date(date_obj: datetime) -> str:
+        return date_obj.strftime("%d/%m/%Y")
 
-    return response_json
+    begin_date = parse_date(begin)
+    end_date = parse_date(end)
+    max_interval = timedelta(days=365 * 10)
+    results = []
+
+    current_start = begin_date
+    while current_start <= end_date:
+        current_end = min(current_start + max_interval, end_date)
+        request_url = (
+            f"https://api.bcb.gov.br/dados/serie/bcdata.sgs.{ts_code}"
+            f"/dados?formato=json&dataInicial={format_date(current_start)}&dataFinal={format_date(current_end)}"
+        )
+        try:
+            response = requests.get(request_url, timeout=30)
+            response.raise_for_status()
+            response_json = response.json()
+            results.extend(response_json)
+        except Exception as e:
+            print(f"Tentativa {ntry + 1} falhou: {e}")
+            ntry += 1
+            if ntry < MAX_RETRIES:
+                wait_time = 2**ntry
+                print(f"Aguardando {wait_time}s antes de tentar novamente...")
+                time.sleep(wait_time)
+                return get_data(ts_code, begin, end, ntry)
+            else:
+                raise e
+
+        current_start = current_end + timedelta(days=1)
+
+    return results
 
 
 def get_data_with_strict_range(ts_code: int, begin: str, end: str) -> List:
